@@ -37,20 +37,23 @@ lanes = [left_lane, center_lane, right_lane]
 lane_anim = 0
 
 # classe carro
-class carro(pygame.sprite.Sprite):
+class Carro(pygame.sprite.Sprite):
     def __init__(self, image, x, y):
         pygame.sprite.Sprite.__init__(self)
+        
         rect = image.get_rect()
-        image_scale = (45 / rect.width)*2.5
+
+        image_scale = (30 / rect.width) * 2.5 
         new_width = int(rect.width * image_scale)
         new_height = int(rect.height * image_scale)
         self.image = pygame.transform.scale(image, (new_width, new_height))
+        
         self.rect = self.image.get_rect()
         self.rect.center = [x, y]
 
-class playerc(carro):
+class PlayerCar(Carro):
     def __init__(self, x, y):
-        image = pygame.image.load('audi.png')  
+        image = pygame.image.load('imagens/car.png')
         super().__init__(image, x, y)
 
 # jogador
@@ -58,29 +61,53 @@ player_x = 250
 player_y = 400
 
 player_group = pygame.sprite.Group()
-player = playerc(player_x, player_y)
+player = PlayerCar(player_x, player_y)
 player_group.add(player)
 
-#outros carros
+# outros carros
+image_file = ['police.png', 'ambulance.png', 'mini_van.png', 'taxi.png']
+carros_images = []
+for file in image_file:
+    try:
+        image = pygame.image.load('imagens/' + file)
+        carros_images.append(image)
+    except pygame.error as e:
+        print(f"Erro ao carregar imagem {file}: {e}")
+        image = pygame.Surface((60, 100))  # Ajustado para largura 60
+        image.fill(red)
+        carros_images.append(image)
 
+carro_grupo = pygame.sprite.Group()
 
+# batida dos carros
+try:
+    crash = pygame.image.load('imagens/explosion4.png').convert_alpha()
+except pygame.error as e:
+    print(f"Erro ao carregar imagem explosion4.png: {e}")
+    # fallback simples
+    crash = pygame.Surface((60, 60), pygame.SRCALPHA)
+    pygame.draw.circle(crash, red, (30, 30), 30)
+crash_rect = crash.get_rect()
 
 # loop principal
 clock = pygame.time.Clock()
 fps = 120
 running = True
 while running:
+    
     clock.tick(fps)
+    
     for evento in pygame.event.get():
         if evento.type == pygame.QUIT:
             running = False
 
         # movimentos carro
-        if evento.type == pygame.KEYDOWN:
-            if evento.key == pygame.K_LEFT and player.rect.center[0] > left_lane:
-                player.rect.x -= 100
-            elif evento.key == pygame.K_RIGHT and player.rect.center[0] < right_lane:
-                player.rect.x += 100
+        if not gameover:
+            if evento.type == pygame.KEYDOWN:
+                if evento.key == pygame.K_LEFT and player.rect.center[0] > left_lane:
+                    player.rect.x -= 100
+                elif evento.key == pygame.K_RIGHT and player.rect.center[0] < right_lane:
+                    player.rect.x += 100
 
     # fundo
     screen.fill(green)
@@ -99,6 +126,74 @@ while running:
     # desenha carro do jogador
     player_group.draw(screen)
 
+    # adicionar carros
+    if not gameover and len(carro_grupo) < 2:
+        # espaço entre os carros
+        add_carro = True
+        for car in carro_grupo:
+            if car.rect.top < car.rect.height * 1.5:
+                add_carro = False
+                
+        if add_carro:
+            lane = random.choice(lanes)
+            image = random.choice(carros_images)
+            veiculo = Carro(image, lane, height / -2)
+            carro_grupo.add(veiculo)
+
+    # movimentação dos carros
+    if not gameover:
+        for veiculo in carro_grupo:
+            veiculo.rect.y += speed
+
+            # remove o que vai pra fora da tela
+            if veiculo.rect.top >= height:
+                veiculo.kill()
+                score += 1
+                
+                # aumento da velocidade após 5 carros
+                if score > 0 and score % 5 == 0:
+                    speed += 1
+
+    # desenhar carros
+    carro_grupo.draw(screen)
+
+    # score
+    font = pygame.font.Font(pygame.font.get_default_font(), 16)
+    text = font.render('Score:' + str(score), True, white)
+    text_rect = text.get_rect()
+    text_rect.center = (50, 450)
+    screen.blit(text, text_rect)
+
+    # confere se tem colisão
+    if not gameover and pygame.sprite.spritecollide(player, carro_grupo, False):
+        gameover = True
+        crash_rect.center = player.rect.center
+
+    if gameover:
+        screen.blit(crash, crash_rect)
+        pygame.draw.rect(screen, red, (0, 50, width, 100))
+        font = pygame.font.Font(pygame.font.get_default_font(), 16)
+        text = font.render('Game over. Press Y to play again or N to quit.', True, white)
+        text_rect = text.get_rect()
+        text_rect.center = (width / 2, 100)
+        screen.blit(text, text_rect)
+
+        # play again
+        for evento in pygame.event.get():
+            if evento.type == pygame.QUIT:
+                running = False
+            if evento.type == pygame.KEYDOWN:
+                if evento.key == pygame.K_y:
+                    # reset
+                    gameover = False
+                    speed = 2
+                    score = 0
+                    carro_grupo.empty()
+                    player.rect.center = [player_x, player_y]
+                elif evento.key == pygame.K_n:
+                    running = False
+
     pygame.display.update()
 
 pygame.quit()
+
