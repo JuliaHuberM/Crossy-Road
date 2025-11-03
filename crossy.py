@@ -3,12 +3,27 @@ import pygame
 import random
 
 pygame.init()
+pygame.mixer.init()  # Inicializa o mixer de áudio
 
 width = 500
 height = 500
 screen_size = (width, height)
 screen = pygame.display.set_mode(screen_size)
 pygame.display.set_caption('crossy road')
+
+# Carregar música de fundo (adicione o arquivo 'musica_fundo.mp3' na pasta do projeto)
+try:
+    pygame.mixer.music.load('trilha.mp3')
+    pygame.mixer.music.play(-1)  # Loop infinito
+except pygame.error as e:
+    print(f"Erro ao carregar música de fundo: {e}")
+
+# Carregar som de colisão (adicione o arquivo 'som_colisao.wav' na pasta do projeto)
+try:
+    crash_sound = pygame.mixer.Sound('batida.mp3')
+except pygame.error as e:
+    print(f"Erro ao carregar som de colisão: {e}")
+    crash_sound = None  # Fallback: sem som
 
 # cores
 gray = (100, 100, 100)
@@ -42,8 +57,9 @@ class Carro(pygame.sprite.Sprite):
         pygame.sprite.Sprite.__init__(self)
         
         rect = image.get_rect()
-
-        image_scale = (30 / rect.width) * 2.5 
+        # Ajuste a escala para reduzir a largura e evitar sobreposição entre lanes
+        # Novo: image_scale reduzido para ~60-70 pixels de largura (menor que 100 pixels entre lanes)
+        image_scale = (30 / rect.width) * 2.5  # Reduzido de 45 para 30 para estreitar
         new_width = int(rect.width * image_scale)
         new_height = int(rect.height * image_scale)
         self.image = pygame.transform.scale(image, (new_width, new_height))
@@ -168,8 +184,13 @@ while running:
     if not gameover and pygame.sprite.spritecollide(player, carro_grupo, False):
         gameover = True
         crash_rect.center = player.rect.center
+        # Tocar som de colisão
+        if crash_sound:
+            crash_sound.play()
 
     if gameover:
+        # Parar música de fundo na tela de game over (opcional, para "durante todo jogo" pode remover)
+        pygame.mixer.music.stop()
         screen.blit(crash, crash_rect)
         pygame.draw.rect(screen, red, (0, 50, width, 100))
         font = pygame.font.Font(pygame.font.get_default_font(), 16)
@@ -190,10 +211,11 @@ while running:
                     score = 0
                     carro_grupo.empty()
                     player.rect.center = [player_x, player_y]
+                    # Reiniciar música de fundo
+                    pygame.mixer.music.play(-1)
                 elif evento.key == pygame.K_n:
                     running = False
 
     pygame.display.update()
 
 pygame.quit()
-
